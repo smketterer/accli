@@ -76,6 +76,31 @@ def prompt_user_for_billable_status(ac) -> int:
     return billable
 
 
+def prompt_user_for_lift_user(ac) -> Dict:
+    """Prompt the user for a user."""
+    users = ac.get_users()
+    lift_users = [x for x in users if x['company_id'] == 1]
+    suggestions = [x['display_name'] for x in lift_users]
+    current_user = next(x for x in lift_users if x['email'] == ac.config.user)
+    completer = FuzzyCompleter(suggestions)
+    text = prompt('(User)> ', default=current_user['display_name'], completer=completer)
+    user = next(x for x in lift_users if x['display_name'] == text)
+    return user
+
+
+def create_task(ac):
+    """Create a task."""
+    project = prompt_user_for_project(ac)
+    name = prompt('(Name)> ')
+    user = prompt_user_for_lift_user(ac)
+    data = {
+        'name': name,
+        'assignee_id': user['id'],
+    }
+    url = '/projects/{}/tasks'.format(project['id'])
+    ac.post(url, data)
+
+
 def create_time_record(ac):
     """Super Innefficient calls to create a time record."""
     project = prompt_user_for_project(ac)
@@ -209,13 +234,19 @@ def main():
     ac.authenticate()
     actions = {
         'Create Time Record': create_time_record,
+        'Create Task': create_task,
         'List Daily Time Records': list_daily_time_records,
         'List Weekly Time Records': list_weekly_time_records,
     }
     completer = FuzzyCompleter(actions.keys())
+    print(t.blue('Active Collab CLI (Press <tab> for options)'))
+    print('')
     while True:
         action = prompt('(Action)> ', completer=completer)
-        actions[action](ac)
+        try:
+            actions[action](ac)
+        except KeyError:
+            print('Bad Input, please try again.')
 
 
 if __name__ == '__main__':
