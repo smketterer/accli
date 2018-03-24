@@ -39,6 +39,7 @@ chmod +x cli.py
 
 ## Create a time Record
 
+- Can track time to a task, can be left blank
 - Value can accept standard '0:30' or '0.5' but also accepts an int of minutes.
   E.g '15' or '120'
 - Summary can user Ctrl+x Ctrl+e to launch $EDITOR for editing the message
