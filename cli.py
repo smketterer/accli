@@ -25,32 +25,42 @@ def create_time_record(ac):
     completer = FuzzyCompleter(suggestions)
     text = prompt('(Project)> ', completer=completer)
     project = next(x for x in projects if x['name'] == text)
-    # Value
+    # Get Task
+    tasks = ac.get_tasks_by_project(project['id'])['tasks']
+    suggestions = [x['name'] for x in tasks]
+    completer = FuzzyCompleter(suggestions)
+    text = prompt('(Task)> ', completer=completer)
+    if text:
+        task = next(x for x in tasks if x['name'] == text)
+    else:
+        task = None
+    # Get Value
     value = prompt('(Value)> ')
     # If integer is passed then treat it as minutes
     if ('.' not in value) and (':' not in value):
         value = float(value) / 60
-    # Job Type
+    # Get Job Type
     job_types = ac.get_job_types()
     suggestions = [x['name'] for x in job_types]
     completer = FuzzyCompleter(suggestions)
     text = prompt('(Job Type)> ', completer=completer)
     job_type = next(x for x in job_types if x['name'] == text)
-    # Date
+    # Get Date
     completer = DateFuzzyCompleter()
     text = prompt('(Date)> ', completer=completer)
     choosen_date = datetime.datetime.strptime(text, '%a, %Y-%m-%d')
-    # Billable
+    # Get Billable
     billable_choices = {True: 1, False: 0}
     billable = confirm('(Billable (y/n))> ')
     billable = billable_choices[billable]
-    # Summary
+    # Get Summary
     summary = prompt('(Summary)> ', enable_open_in_editor=True)
-    # User
+    # Get User
     users = ac.get_users()
     user = next(x for x in users if x['email'] == ac.config.user)
     data = {
         'value': value,
+        'task_id': task['id'] if task else None,
         'user_id': user['id'],
         'job_type_id': job_type['id'],
         'record_date': choosen_date.strftime('%Y-%m-%d'),
@@ -181,5 +191,5 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         print('Have a nice day!')

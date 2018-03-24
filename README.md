@@ -3,7 +3,7 @@
 Python 3 only Cli app for working with the self hosted collab api. Very
 unstable and prone to breaking.
 
-https://developers.activecollab.com/api-documentation/v1/people/users/all.html
+https://developers.activecollab.com/api-documentation
 
 # Getting Started
 

@@ -95,3 +95,7 @@ class ActiveCollab(object):
     def get_time_records(self, user_id: str) -> Dict:
         """Get the time records for a user."""
         return self.get('/users/{}/time-records'.format(user_id))
+
+    def get_tasks_by_project(self, project_id: str) -> Dict:
+        """Get the tasks for a specific project."""
+        return self.get('/projects/{}/tasks'.format(project_id))
