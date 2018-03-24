@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """CLI App."""
 import datetime
@@ -7,92 +7,14 @@ import os
 
 from blessings import Terminal
 
-from fuzzyfinder import fuzzyfinder
 from prompt_toolkit import prompt
-from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.shortcuts import confirm
+
+from completers import DateFuzzyCompleter, FuzzyCompleter, WeekFuzzyCompleter
 from pyactivecollab import ActiveCollab, Config
+from utils import timestamp_field_to_datetime
 
 t = Terminal()
-
-
-class FuzzyCompleter(Completer):
-    """Fuzzy Completer Alpha Sorted."""
-
-    def __init__(self, words):
-        """Initialize."""
-        self.words = words
-
-    def get_completions(self, document, complete_event):
-        """Use fuzzyfinder for completions."""
-        word_before_cursor = document.text_before_cursor
-        words = fuzzyfinder(word_before_cursor, self.words)
-        for x in words:
-            yield Completion(x, -len(word_before_cursor))
-
-
-class DateFuzzyCompleter(Completer):
-    """Fuzzy Completer For Dates."""
-
-    def get_completions(self, document, complete_event):
-        """Use fuzzyfinder for date completions.
-
-        The fuzzyfind auto sorts by alpha so this is to show dates relative to
-        the current date instead of by day of week.
-        """
-        base = datetime.datetime.today()
-        date_format = '%a, %Y-%m-%d'
-        date_list = [(base - datetime.timedelta(days=x)).strftime(date_format)
-                     for x in range(0, 30)]
-        word_before_cursor = document.text_before_cursor
-        words = fuzzyfinder(word_before_cursor, date_list)
-
-        def sort_by_date(date_str: str):
-            return datetime.datetime.strptime(date_str, date_format)
-
-        # Re-sort by date rather than day name
-        words = sorted(words, key=sort_by_date, reverse=True)
-        for x in words:
-            yield Completion(x, -len(word_before_cursor))
-
-
-class WeekFuzzyCompleter(Completer):
-    """Fuzzy Completer For Weeks."""
-
-    def get_completions(self, document, complete_event):
-        """Use fuzzyfinder for week completions."""
-        def datetime_to_week_str(dt: datetime.datetime):
-            """Convert a datetime to weekstring.
-
-            datetime.datetime(2018, 2, 26, 0, 0) => '2018-02-26 to 2018-03-04'
-            """
-            if dt.weekday() != 0:
-                monday_dt = dt - datetime.timedelta(days=dt.weekday())
-            else:
-                monday_dt = dt
-            sunday_dt = monday_dt + datetime.timedelta(days=6)
-            return '{} to {}'.format(
-                monday_dt.strftime('%Y-%m-%d'), sunday_dt.strftime('%Y-%m-%d'))
-
-        base = datetime.datetime.today()
-        week_list = [datetime_to_week_str(base - datetime.timedelta(weeks=x))
-                     for x in range(0, 5)]
-        word_before_cursor = document.text_before_cursor
-        words = fuzzyfinder(word_before_cursor, week_list)
-        words = sorted(words, reverse=True)
-        for x in words:
-            yield Completion(x, -len(word_before_cursor))
-
-
-def timestamp_to_datetime(json, fieldname):
-    """Convert field from timestamp to datetime for json.
-
-    Currenlty hardcoded to MST timezone
-    """
-    timestamp = json[fieldname]
-    mst_hours = datetime.timedelta(hours=7)
-    json[fieldname] = datetime.datetime.fromtimestamp(timestamp) + mst_hours
-    return json
 
 
 def create_time_record(ac):
@@ -126,14 +48,14 @@ def create_time_record(ac):
     summary = prompt('(Summary)> ', enable_open_in_editor=True)
     # User
     users = ac.get_users()
-    user = next(x for x in users if x['email'] == config.user)
+    user = next(x for x in users if x['email'] == ac.config.user)
     data = {
         'value': value,
         'user_id': user['id'],
         'job_type_id': job_type['id'],
         'record_date': choosen_date.strftime('%Y-%m-%d'),
         'billable_status': billable,
-        'summary': summary
+        'summary': summary,
     }
     url = '/projects/{}/time-records'.format(project['id'])
     ac.post(url, data)
@@ -155,10 +77,10 @@ def list_daily_time_records(ac):
         else:
             valid = True
     users = ac.get_users()
-    user = next(x for x in users if x['email'] == config.user)
+    user = next(x for x in users if x['email'] == ac.config.user)
     r = ac.get_time_records(user['id'])
     time_records = r['time_records']
-    time_records = [timestamp_to_datetime(x, 'record_date') for x in time_records]
+    time_records = [timestamp_field_to_datetime(x, 'record_date') for x in time_records]
     daily_time_records = [x for x in time_records
                           if x['record_date'].date() == choosen_date.date()]
     billable = 0
@@ -194,10 +116,10 @@ def list_weekly_time_records(ac):
         else:
             valid = True
     users = ac.get_users()
-    user = next(x for x in users if x['email'] == config.user)
+    user = next(x for x in users if x['email'] == ac.config.user)
     r = ac.get_time_records(user['id'])
     time_records = r['time_records']
-    time_records = [timestamp_to_datetime(x, 'record_date') for x in time_records]
+    time_records = [timestamp_field_to_datetime(x, 'record_date') for x in time_records]
     weekly_time_records = [x for x in time_records if
                            x['record_date'].date() >= monday_dt.date() and
                            x['record_date'].date() <= sunday_dt.date()]
@@ -235,20 +157,29 @@ def list_weekly_time_records(ac):
     print('Percent Billable: {:.2f}%'.format(100 - ((37.5-weekly_billable)/37.5*100)))
 
 
-# Load config, ensure password
-config = Config()
-config.load()
-if not config.password:
-    config.password = getpass.getpass()
+def main():
+    """Run main loop of script."""
+    # Load config, ensure password
+    config = Config()
+    config.load()
+    if not config.password:
+        config.password = getpass.getpass()
 
-ac = ActiveCollab(config)
-ac.authenticate()
-actions = {
-    'Create Time Record': create_time_record,
-    'List Daily Time Records': list_daily_time_records,
-    'List Weekly Time Records': list_weekly_time_records,
-}
-completer = FuzzyCompleter(actions.keys())
-while True:
-    action = prompt('(Action)> ', completer=completer)
-    actions[action](ac)
+    ac = ActiveCollab(config)
+    ac.authenticate()
+    actions = {
+        'Create Time Record': create_time_record,
+        'List Daily Time Records': list_daily_time_records,
+        'List Weekly Time Records': list_weekly_time_records,
+    }
+    completer = FuzzyCompleter(actions.keys())
+    while True:
+        action = prompt('(Action)> ', completer=completer)
+        actions[action](ac)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Have a nice day!')
