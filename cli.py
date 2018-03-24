@@ -4,6 +4,7 @@
 import datetime
 import getpass
 import os
+from typing import Dict
 
 from blessings import Terminal
 
@@ -17,15 +18,18 @@ from utils import timestamp_field_to_datetime
 t = Terminal()
 
 
-def create_time_record(ac):
-    """Super Innefficient calls to create a time record."""
-    # Get Project
+def prompt_user_for_project(ac) -> Dict:
+    """Prompt user for a project."""
     projects = ac.get_projects()
     suggestions = [x['name'] for x in projects]
     completer = FuzzyCompleter(suggestions)
     text = prompt('(Project)> ', completer=completer)
     project = next(x for x in projects if x['name'] == text)
-    # Get Task
+    return project
+
+
+def prompt_user_for_task(ac, project) -> Dict:
+    """Prompt the user for a task."""
     tasks = ac.get_tasks_by_project(project['id'])['tasks']
     suggestions = [x['name'] for x in tasks]
     completer = FuzzyCompleter(suggestions)
@@ -34,26 +38,52 @@ def create_time_record(ac):
         task = next(x for x in tasks if x['name'] == text)
     else:
         task = None
-    # Get Value
+    return task
+
+
+def prompt_user_for_time_value(ac) -> str:
+    """Prompt the user for a time value."""
     value = prompt('(Value)> ')
     # If integer is passed then treat it as minutes
     if ('.' not in value) and (':' not in value):
         value = float(value) / 60
-    # Get Job Type
+    return value
+
+
+def prompt_user_for_job_type(ac) -> Dict:
+    """Prompt the user for a job type."""
     job_types = ac.get_job_types()
     suggestions = [x['name'] for x in job_types]
     completer = FuzzyCompleter(suggestions)
     text = prompt('(Job Type)> ', completer=completer)
     job_type = next(x for x in job_types if x['name'] == text)
-    # Get Date
+    return job_type
+
+
+def prompt_user_for_date(ac) -> str:
+    """Prompt the user for a date."""
     completer = DateFuzzyCompleter()
     text = prompt('(Date)> ', completer=completer)
     choosen_date = datetime.datetime.strptime(text, '%a, %Y-%m-%d')
-    # Get Billable
+    return choosen_date.strftime('%Y-%m-%d')
+
+
+def prompt_user_for_billable_status(ac) -> int:
+    """Prompt the user for a billable status."""
     billable_choices = {True: 1, False: 0}
     billable = confirm('(Billable (y/n))> ')
     billable = billable_choices[billable]
-    # Get Summary
+    return billable
+
+
+def create_time_record(ac):
+    """Super Innefficient calls to create a time record."""
+    project = prompt_user_for_project(ac)
+    task = prompt_user_for_task(ac, project)
+    value = prompt_user_for_time_value(ac)
+    job_type = prompt_user_for_job_type(ac)
+    billable = prompt_user_for_billable_status(ac)
+    date = prompt_user_for_date(ac)
     summary = prompt('(Summary)> ', enable_open_in_editor=True)
     # Get User
     users = ac.get_users()
@@ -63,7 +93,7 @@ def create_time_record(ac):
         'task_id': task['id'] if task else None,
         'user_id': user['id'],
         'job_type_id': job_type['id'],
-        'record_date': choosen_date.strftime('%Y-%m-%d'),
+        'record_date': date,
         'billable_status': billable,
         'summary': summary,
     }
